@@ -24,7 +24,7 @@ FOLDER_NAME = "Hindustan_Hack_Projects"
 CUSTOM_PREFIX = "Hindustan_Hack_"
 
 def get_robust_session():
-    """कनेक्शन को मजबूत बनाने और नेटवर्क एरर से बचने के लिए सेशन सेट-अप"""
+    """Builds a resilient HTTP session with retry mechanisms to prevent network errors."""
     session = requests.Session()
     retries = Retry(
         total=5,
@@ -38,7 +38,7 @@ def get_robust_session():
     return session
 
 def display_banner():
-    # Termux/Mobile स्क्रीन पर टेक्स्ट फटने से बचाने के लिए 'small' फ़ॉन्ट
+    # Uses 'small' font to ensure perfect rendering on mobile screens like the protection tool
     try:
         banner_text = pyfiglet.figlet_format("HINDUSTAN", font="small")
     except Exception:
@@ -54,7 +54,7 @@ def display_banner():
         subtitle="[bold yellow] Developer: @Rolexconfigyt [/bold yellow]"
     ))
     
-    desc = Text("🚀 Advanced Direct Source Code & Asset Scraper (Up to 10GB Engine)\nAuto-Saves Original Package directly into MT Manager!", style="bold green", justify="center")
+    desc = Text("🚀 Advanced Direct Source Code & Asset Scraper\nSecure & Fast Web Extraction Engine", style="bold green", justify="center")
     console.print(Panel(desc, box=box.ROUNDED, border_style="green"))
     console.print()
 
@@ -72,7 +72,20 @@ def format_size(size):
         size /= 1024.0
     return f"{size:.2f} TB"
 
-# Memory-Safe 4MB Chunk Streaming for Heavy Assets (Videos, High-Res Images)
+def get_output_directory():
+    """Automatically selects storage directory and gracefully falls back if permission is denied."""
+    sdcard_path = Path("/sdcard/Download") / FOLDER_NAME
+    try:
+        sdcard_path.mkdir(parents=True, exist_ok=True)
+        test_file = sdcard_path / ".perm_test"
+        test_file.touch()
+        test_file.unlink()
+        return sdcard_path
+    except Exception:
+        local_path = Path(".") / FOLDER_NAME
+        local_path.mkdir(parents=True, exist_ok=True)
+        return local_path
+
 def download_heavy_asset(asset_info, headers, output_folder, session):
     url, local_path = asset_info
     try:
@@ -82,7 +95,7 @@ def download_heavy_asset(asset_info, headers, output_folder, session):
         with session.get(url, headers=headers, timeout=60, stream=True) as res:
             if res.status_code == 200:
                 with open(full_path, 'wb') as f:
-                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB Chunks
+                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB High-Speed Chunks
                         if chunk:
                             f.write(chunk)
                 return True
@@ -99,23 +112,18 @@ def extract_direct_source(target_url):
     session = get_robust_session()
     site_name = get_clean_site_name(target_url)
     
-    # Auto Directory Path Setup for MT Manager
-    base_download_dir = Path("/sdcard/Download")
-    if not base_download_dir.exists():
-        base_download_dir = Path(".")
-        
-    hindustan_folder = base_download_dir / FOLDER_NAME
-    hindustan_folder.mkdir(parents=True, exist_ok=True)
+    output_dir = get_output_directory()
 
     zip_filename = f"{CUSTOM_PREFIX}{site_name}.zip"
-    zip_path = hindustan_folder / zip_filename
+    zip_path = output_dir / zip_filename
 
-    temp_dir = hindustan_folder / f"temp_{site_name}"
+    temp_dir = output_dir / f"temp_{site_name}"
     assets_dir = temp_dir / "assets"
+    
     temp_dir.mkdir(parents=True, exist_ok=True)
     assets_dir.mkdir(parents=True, exist_ok=True)
 
-    console.print(f"[cyan]🌐 Connecting directly to {target_url}...[/cyan]")
+    console.print(f"[bold cyan]🌐 Connecting directly to {target_url}...[/bold cyan]")
     try:
         response = session.get(target_url, headers=headers, timeout=40)
         response.raise_for_status()
@@ -124,7 +132,6 @@ def extract_direct_source(target_url):
         console.print(f"[bold red]❌ Connection Error:[/bold red] {e}")
         return None, 0
 
-    # Asset Discovery using Regex
     asset_urls = re.findall(r'(?:href|src|action)=["\'](.*?)["\']', raw_html)
     
     download_queue = []
@@ -150,10 +157,8 @@ def extract_direct_source(target_url):
         download_queue.append((full_url, relative_path))
         raw_html = raw_html.replace(link, f"assets/{filename}")
 
-    # Save Primary HTML Code
     (temp_dir / "index.html").write_text(raw_html, encoding='utf-8')
 
-    # Multi-Threaded Engine for Heavy Downloading
     if download_queue:
         with Progress(
             SpinnerColumn(),
@@ -163,7 +168,7 @@ def extract_direct_source(target_url):
             console=console,
             transient=True
         ) as progress:
-            task = progress.add_task(f"[yellow]📦 Extracting {len(download_queue)} Assets (Up to 10GB Capacity)...", total=len(download_queue))
+            task = progress.add_task(f"[bold yellow]📦 Extracting {len(download_queue)} Assets...", total=len(download_queue))
             
             with ThreadPoolExecutor(max_workers=20) as executor:
                 futures = [executor.submit(download_heavy_asset, item, headers, temp_dir, session) for item in download_queue]
@@ -171,8 +176,7 @@ def extract_direct_source(target_url):
                     future.result()
                     progress.advance(task)
 
-    # Creating ZIP Archive
-    console.print("[green]⚡ Packaging extracted source into ZIP...[/green]")
+    console.print("[bold green]⚡ Packaging extracted source into ZIP...[/bold green]")
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
         for root, _, files in os.walk(temp_dir):
             for file in files:
@@ -180,7 +184,6 @@ def extract_direct_source(target_url):
                 arcname = file_path.relative_to(temp_dir)
                 zipf.write(file_path, arcname)
 
-    # Cleanup Temporary Folder
     try:
         shutil.rmtree(temp_dir)
     except Exception:
@@ -208,7 +211,7 @@ def main():
             f"🎯 [bold cyan]Target URL:[/bold cyan] [yellow]{target_url}[/yellow]\n"
             f"📦 [bold cyan]Saved Package:[/bold cyan] [bold green]{Path(zip_file).name}[/bold green]\n"
             f"📏 [bold cyan]Package Size:[/bold cyan]  [bold yellow]{format_size(size)}[/bold yellow]\n\n"
-            f"📂 [bold yellow]MT Manager Auto-Saved Path:[/bold yellow]\nOpen MT Manager ➔ Download ➔ [bold cyan]{FOLDER_NAME}[/bold cyan] ➔ [bold green]{Path(zip_file).name}[/bold green]",
+            f"📂 [bold yellow]Output Location:[/bold yellow]\n[bold green]{Path(zip_file).absolute()}[/bold green]",
             box=box.HEAVY,
             border_style="green",
             title="[bold green] ✨ HINDUSTAN EXTRACTOR RESULT ✨ [/bold green]"
