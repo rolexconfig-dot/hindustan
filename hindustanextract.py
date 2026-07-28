@@ -1,7 +1,8 @@
-
 import os
 import re
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
 import zipfile
@@ -22,23 +23,38 @@ console = Console()
 FOLDER_NAME = "Hindustan_Hack_Projects"
 CUSTOM_PREFIX = "Hindustan_Hack_"
 
+def get_robust_session():
+    """कनेक्शन को मजबूत बनाने और नेटवर्क एरर से बचने के लिए सेशन सेट-अप"""
+    session = requests.Session()
+    retries = Retry(
+        total=5,
+        backoff_factor=1,
+        status_forcelist=[500, 502, 503, 504],
+        raise_on_status=False
+    )
+    adapter = HTTPAdapter(max_retries=retries, pool_connections=30, pool_maxsize=30)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
+    return session
+
 def display_banner():
+    # Termux/Mobile स्क्रीन पर टेक्स्ट फटने से बचाने के लिए 'small' फ़ॉन्ट
     try:
-        banner_text = pyfiglet.figlet_format("HINDUSTAN", font="slant")
+        banner_text = pyfiglet.figlet_format("HINDUSTAN", font="small")
     except Exception:
-        banner_text = "========================\n   H I N D U S T A N   \n========================"
+        banner_text = "=== HINDUSTAN ==="
         
-    colored_banner = Text(banner_text, style="bold red")
+    colored_banner = Text(banner_text, style="bold cyan")
     
     console.print(Panel(
         colored_banner, 
-        box=box.HEAVY, 
-        border_style="bright_red",
-        title="[bold yellow] 🔥 HINDUSTAN HACK ULTRA EXTRACTOR V3.0 🔥 [/bold yellow]",
-        subtitle="[bold cyan] Pure Direct Extractor Engine (Up to 10GB Limit) [/bold cyan]"
+        box=box.DOUBLE, 
+        border_style="cyan",
+        title="[bold red] Extractor v1.0 [/bold red]",
+        subtitle="[bold yellow] Developer: @Rolexconfigyt [/bold yellow]"
     ))
     
-    desc = Text("⚡ Direct Multi-Threaded Source Code & Asset Scraper\nAuto-Saves Original Package directly into MT Manager!", style="bold green", justify="center")
+    desc = Text("🚀 Advanced Direct Source Code & Asset Scraper (Up to 10GB Engine)\nAuto-Saves Original Package directly into MT Manager!", style="bold green", justify="center")
     console.print(Panel(desc, box=box.ROUNDED, border_style="green"))
     console.print()
 
@@ -56,17 +72,17 @@ def format_size(size):
         size /= 1024.0
     return f"{size:.2f} TB"
 
-# Memory-Safe 4MB Chunk Streaming for Heavy Assets (Up to 10GB)
-def download_heavy_asset(asset_info, headers, output_folder):
+# Memory-Safe 4MB Chunk Streaming for Heavy Assets (Videos, High-Res Images)
+def download_heavy_asset(asset_info, headers, output_folder, session):
     url, local_path = asset_info
     try:
         full_path = output_folder / local_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with requests.get(url, headers=headers, timeout=60, stream=True) as res:
+        with session.get(url, headers=headers, timeout=60, stream=True) as res:
             if res.status_code == 200:
                 with open(full_path, 'wb') as f:
-                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB High-Speed Chunks
+                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB Chunks
                         if chunk:
                             f.write(chunk)
                 return True
@@ -80,6 +96,7 @@ def extract_direct_source(target_url):
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
     }
     
+    session = get_robust_session()
     site_name = get_clean_site_name(target_url)
     
     # Auto Directory Path Setup for MT Manager
@@ -100,14 +117,14 @@ def extract_direct_source(target_url):
 
     console.print(f"[cyan]🌐 Connecting directly to {target_url}...[/cyan]")
     try:
-        response = requests.get(target_url, headers=headers, timeout=40)
+        response = session.get(target_url, headers=headers, timeout=40)
         response.raise_for_status()
         raw_html = response.text
     except Exception as e:
         console.print(f"[bold red]❌ Connection Error:[/bold red] {e}")
         return None, 0
 
-    # Advanced Asset Discovery using Regex (Captures CSS, JS, Media, Fonts, PHP Links)
+    # Asset Discovery using Regex
     asset_urls = re.findall(r'(?:href|src|action)=["\'](.*?)["\']', raw_html)
     
     download_queue = []
@@ -146,10 +163,10 @@ def extract_direct_source(target_url):
             console=console,
             transient=True
         ) as progress:
-            task = progress.add_task(f"[yellow]📦 Extracting {len(download_queue)} Heavy Assets (Up to 10GB Limit)...", total=len(download_queue))
+            task = progress.add_task(f"[yellow]📦 Extracting {len(download_queue)} Assets (Up to 10GB Capacity)...", total=len(download_queue))
             
-            with ThreadPoolExecutor(max_workers=30) as executor:
-                futures = [executor.submit(download_heavy_asset, item, headers, temp_dir) for item in download_queue]
+            with ThreadPoolExecutor(max_workers=20) as executor:
+                futures = [executor.submit(download_heavy_asset, item, headers, temp_dir, session) for item in download_queue]
                 for future in futures:
                     future.result()
                     progress.advance(task)
@@ -163,7 +180,7 @@ def extract_direct_source(target_url):
                 arcname = file_path.relative_to(temp_dir)
                 zipf.write(file_path, arcname)
 
-    # Cleanup Temporary Extractions
+    # Cleanup Temporary Folder
     try:
         shutil.rmtree(temp_dir)
     except Exception:
@@ -193,18 +210,20 @@ def main():
             f"📏 [bold cyan]Package Size:[/bold cyan]  [bold yellow]{format_size(size)}[/bold yellow]\n\n"
             f"📂 [bold yellow]MT Manager Auto-Saved Path:[/bold yellow]\nOpen MT Manager ➔ Download ➔ [bold cyan]{FOLDER_NAME}[/bold cyan] ➔ [bold green]{Path(zip_file).name}[/bold green]",
             box=box.HEAVY,
-            border_style="red",
-            title="[bold yellow] HINDUSTAN EXTRACTOR RESULT [/bold yellow]"
+            border_style="green",
+            title="[bold green] ✨ HINDUSTAN EXTRACTOR RESULT ✨ [/bold green]"
         ))
     
     another = Prompt.ask("\n[bold cyan]🔄 Extract another website?[/bold cyan]", choices=["y", "n"], default="n")
     if another.lower() == 'y':
         main()
     else:
-        console.print("\n[bold red]🙏 Thank you for using Hindustan Hack Tool![/bold red]\n")
+        console.print("\n[bold green]🙏 Thanks for using Hindustan Hack! Stay Secure. 🔒[/bold green]\n")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
         console.print("\n\n[yellow]👋 Exited by user. Goodbye![/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]❌ Unexpected error: {e}[/red]")
