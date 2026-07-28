@@ -19,26 +19,25 @@ import pyfiglet
 
 console = Console()
 
-# Automatic Storage Settings (MT Manager Auto Path)
+# Automatic Storage Settings (MT Manager / Termux / Storage Path)
 FOLDER_NAME = "Hindustan_Hack_Projects"
 CUSTOM_PREFIX = "Hindustan_Hack_"
 
 def get_robust_session():
-    """Builds a resilient HTTP session with retry mechanisms to prevent network errors."""
+    """Builds an enterprise-grade resilient HTTP session with retry logic for heavy transfers."""
     session = requests.Session()
     retries = Retry(
-        total=5,
-        backoff_factor=1,
-        status_forcelist=[500, 502, 503, 504],
+        total=10,
+        backoff_factor=1.5,
+        status_forcelist=[500, 502, 503, 504, 429],
         raise_on_status=False
     )
-    adapter = HTTPAdapter(max_retries=retries, pool_connections=30, pool_maxsize=30)
+    adapter = HTTPAdapter(max_retries=retries, pool_connections=50, pool_maxsize=50)
     session.mount('http://', adapter)
     session.mount('https://', adapter)
     return session
 
 def display_banner():
-    # Uses 'small' font to ensure perfect rendering on mobile screens like the protection tool
     try:
         banner_text = pyfiglet.figlet_format("HINDUSTAN", font="small")
     except Exception:
@@ -50,11 +49,11 @@ def display_banner():
         colored_banner, 
         box=box.DOUBLE, 
         border_style="cyan",
-        title="[bold red] Extractor v1.0 [/bold red]",
+        title="[bold red] Ultra Extractor v3.0 Pro [/bold red]",
         subtitle="[bold yellow] Developer: @Rolexconfigyt [/bold yellow]"
     ))
     
-    desc = Text("🚀 Advanced Direct Source Code & Asset Scraper\nSecure & Fast Web Extraction Engine", style="bold green", justify="center")
+    desc = Text("🚀 High-Capacity (10GB+) Direct Source Code & Multi-Asset Scraper\nPro Asset Isolation Engine for CSS, JS, Media & Media Paths", style="bold green", justify="center")
     console.print(Panel(desc, box=box.ROUNDED, border_style="green"))
     console.print()
 
@@ -73,7 +72,7 @@ def format_size(size):
     return f"{size:.2f} TB"
 
 def get_output_directory():
-    """Automatically selects storage directory and gracefully falls back if permission is denied."""
+    """Selects target storage path safely, falling back gracefully if permission is denied."""
     sdcard_path = Path("/sdcard/Download") / FOLDER_NAME
     try:
         sdcard_path.mkdir(parents=True, exist_ok=True)
@@ -86,16 +85,34 @@ def get_output_directory():
         local_path.mkdir(parents=True, exist_ok=True)
         return local_path
 
-def download_heavy_asset(asset_info, headers, output_folder, session):
-    url, local_path = asset_info
+def categorize_extension(ext):
+    ext = ext.lower().split('?')[0]
+    if ext in ['.css']:
+        return "css"
+    elif ext in ['.js', '.mjs']:
+        return "js"
+    elif ext in ['.png', '.jpg', '.jpeg', '.gif', '.svg', '.webp', '.ico', '.bmp']:
+        return "images"
+    elif ext in ['.mp4', '.mkv', '.webm', '.avi', '.mov', '.mp3', '.wav', '.ogg']:
+        return "videos"
+    elif ext in ['.woff', '.woff2', '.ttf', '.eot', '.otf']:
+        return "fonts"
+    elif ext in ['.php', '.asp', '.aspx', '.jsp']:
+        return "server_routes"
+    else:
+        return "assets"
+
+def download_asset(asset_info, headers, output_folder, session):
+    url, local_rel_path = asset_info
     try:
-        full_path = output_folder / local_path
+        full_path = output_folder / local_rel_path
         full_path.parent.mkdir(parents=True, exist_ok=True)
         
-        with session.get(url, headers=headers, timeout=60, stream=True) as res:
+        # 8MB memory buffer for ultra-large media handling (up to 10GB+)
+        with session.get(url, headers=headers, timeout=120, stream=True) as res:
             if res.status_code == 200:
                 with open(full_path, 'wb') as f:
-                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB High-Speed Chunks
+                    for chunk in res.iter_content(chunk_size=8 * 1024 * 1024):
                         if chunk:
                             f.write(chunk)
                 return True
@@ -111,33 +128,32 @@ def extract_direct_source(target_url):
     
     session = get_robust_session()
     site_name = get_clean_site_name(target_url)
-    
     output_dir = get_output_directory()
 
     zip_filename = f"{CUSTOM_PREFIX}{site_name}.zip"
     zip_path = output_dir / zip_filename
-
     temp_dir = output_dir / f"temp_{site_name}"
-    assets_dir = temp_dir / "assets"
     
     temp_dir.mkdir(parents=True, exist_ok=True)
-    assets_dir.mkdir(parents=True, exist_ok=True)
 
     console.print(f"[bold cyan]🌐 Connecting directly to {target_url}...[/bold cyan]")
     try:
-        response = session.get(target_url, headers=headers, timeout=40)
+        response = session.get(target_url, headers=headers, timeout=60)
         response.raise_for_status()
         raw_html = response.text
     except Exception as e:
         console.print(f"[bold red]❌ Connection Error:[/bold red] {e}")
         return None, 0
 
-    asset_urls = re.findall(r'(?:href|src|action)=["\'](.*?)["\']', raw_html)
+    # Scan HTML tags and internal CSS url() calls
+    html_links = re.findall(r'(?:href|src|action)=["\'](.*?)["\']', raw_html)
+    css_links = re.findall(r'url\(["\']?(.*?)["\']?\)', raw_html)
     
+    all_links = html_links + css_links
     download_queue = []
     seen = set()
     
-    for link in asset_urls:
+    for count, link in enumerate(all_links, start=1):
         if link.startswith("data:") or link.startswith("#") or link.startswith("javascript:"):
             continue
             
@@ -146,19 +162,22 @@ def extract_direct_source(target_url):
             continue
         seen.add(full_url)
         
-        parsed = urlparse(full_url)
-        ext = Path(parsed.path).suffix
-        if not ext or len(ext) > 5:
+        parsed_path = urlparse(full_url).path
+        ext = Path(parsed_path).suffix
+        if not ext or len(ext) > 6:
             ext = ".asset"
             
-        filename = f"file_{len(download_queue) + 1}{ext}"
-        relative_path = Path("assets") / filename
+        subfolder = categorize_extension(ext)
+        filename = f"file_{count}{ext.split('?')[0]}"
+        relative_path = Path(subfolder) / filename
         
         download_queue.append((full_url, relative_path))
-        raw_html = raw_html.replace(link, f"assets/{filename}")
+        raw_html = raw_html.replace(link, f"{subfolder}/{filename}")
 
+    # Write reconstructed root HTML
     (temp_dir / "index.html").write_text(raw_html, encoding='utf-8')
 
+    # Parallel Asset Downloader (High Concurrent Queue)
     if download_queue:
         with Progress(
             SpinnerColumn(),
@@ -168,10 +187,10 @@ def extract_direct_source(target_url):
             console=console,
             transient=True
         ) as progress:
-            task = progress.add_task(f"[bold yellow]📦 Extracting {len(download_queue)} Assets...", total=len(download_queue))
+            task = progress.add_task(f"[bold yellow]📦 Extracting {len(download_queue)} High-Speed Assets...", total=len(download_queue))
             
             with ThreadPoolExecutor(max_workers=20) as executor:
-                futures = [executor.submit(download_heavy_asset, item, headers, temp_dir, session) for item in download_queue]
+                futures = [executor.submit(download_asset, item, headers, temp_dir, session) for item in download_queue]
                 for future in futures:
                     future.result()
                     progress.advance(task)
