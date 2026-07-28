@@ -24,7 +24,7 @@ Open Termux or your terminal and run the following commands:
 pkg update && upgrade
 pkg install python
 pkg install git
-git clone https://github.com/rolexconfig-dot/hindustanhack
+git clone https://github.com/rolexconfig-dot/hindustan
 cd Protection
 pip install -r requirements.txt
 ```
