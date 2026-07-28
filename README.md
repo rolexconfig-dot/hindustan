@@ -21,14 +21,13 @@ Open Termux or your terminal and run the following commands:
 ```bash
 # Click on copy bar for copy All these commands 👉
 
-pkg update && upgrade
-pkg install python
-pkg install git
+pkg update && pkg upgrade -y
+termux-setup-storage
+pkg install python git -y
 git clone https://github.com/rolexconfig-dot/hindustan
 cd hindustan
-
 pip install -r requirements.txt
-```
+
 
 
 🛑 Disclaimer
