@@ -26,7 +26,7 @@ termux-setup-storage
 pkg install python
 pkg install git
 git clone https://github.com/rolexconfig-dot/hindustanhack
-cd Protection
+cd hindustan
 pip install -r requirements.txt
 ```
 
