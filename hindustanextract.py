@@ -4,9 +4,8 @@ import requests
 from urllib.parse import urlparse, urljoin
 from pathlib import Path
 import zipfile
+import shutil
 from concurrent.futures import ThreadPoolExecutor
-from bs4 import BeautifulSoup
-import pyfiglet
 
 from rich.console import Console
 from rich.panel import Panel
@@ -14,32 +13,32 @@ from rich.prompt import Prompt
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TimeElapsedColumn
 from rich import box
 from rich.text import Text
+import pyfiglet
 
 console = Console()
 
-# Custom Prefix for saved files
+# Automatic Storage Settings (MT Manager Auto Path)
+FOLDER_NAME = "Hindustan_Hack_Projects"
 CUSTOM_PREFIX = "Hindustan_Hack_"
 
 def display_banner():
     try:
-        # standard font use kiya hai taaki naam achha dikhe
-        banner_text = pyfiglet.figlet_format("HINDUSTAN", font="standard")
+        banner_text = pyfiglet.figlet_format("HINDUSTAN", font="slant")
     except Exception:
-        banner_text = "=== HINDUSTAN ==="
+        banner_text = "========================\n   H I N D U S T A N   \n========================"
         
-    # Banner color is set to Green as requested
-    colored_banner = Text(banner_text, style="bold green")
+    colored_banner = Text(banner_text, style="bold red")
     
     console.print(Panel(
         colored_banner, 
-        box=box.DOUBLE, 
-        border_style="green",
-        title="[bold orange3] Universal Pro v3.0 [/bold orange3]",
-        subtitle="[bold orange3] Developer: @Rolexconfigyt [/bold orange3]"
+        box=box.HEAVY, 
+        border_style="bright_red",
+        title="[bold yellow] 🔥 HINDUSTAN HACK ULTRA EXTRACTOR V1.0 🔥 [/bold yellow]",
+        subtitle="[bold cyan] Pure Direct Extractor Engine (Up to 10GB Limit) [/bold cyan]"
     ))
     
-    desc = Text("🌐 Direct HTML, CSS, JS, Images & Fonts Extractor\nAuto-Save to Internal Storage / MT Manager!", style="bold green", justify="center")
-    console.print(Panel(desc, box=box.ROUNDED, border_style="orange3"))
+    desc = Text("⚡ Direct Multi-Threaded Source Code & Asset Scraper\nAuto-Saves Original Package directly into MT Manager!", style="bold green", justify="center")
+    console.print(Panel(desc, box=box.ROUNDED, border_style="green"))
     console.print()
 
 def get_clean_site_name(url):
@@ -50,126 +49,94 @@ def get_clean_site_name(url):
     return domain.capitalize()
 
 def format_size(size):
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
         if size < 1024.0:
             return f"{size:.2f} {unit}"
         size /= 1024.0
     return f"{size:.2f} TB"
 
-def get_ext(url, default=".png"):
-    path = urlparse(url).path
-    ext = Path(path).suffix
-    return ext if ext else default
-
-def download_file(url, local_path, headers):
+# Memory-Safe 4MB Chunk Streaming for Heavy Assets (Up to 10GB)
+def download_heavy_asset(asset_info, headers, output_folder):
+    url, local_path = asset_info
     try:
-        res = requests.get(url, headers=headers, timeout=10)
-        if res.status_code == 200:
-            local_path.parent.mkdir(parents=True, exist_ok=True)
-            local_path.write_bytes(res.content)
-            return True
+        full_path = output_folder / local_path
+        full_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        with requests.get(url, headers=headers, timeout=60, stream=True) as res:
+            if res.status_code == 200:
+                with open(full_path, 'wb') as f:
+                    for chunk in res.iter_content(chunk_size=4 * 1024 * 1024):  # 4MB High-Speed Chunks
+                        if chunk:
+                            f.write(chunk)
+                return True
     except Exception:
         pass
     return False
 
-def extract_full_source(target_url):
+def extract_direct_source(target_url):
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8'
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
     }
     
     site_name = get_clean_site_name(target_url)
-    download_dir = Path("/sdcard/Download") if Path("/sdcard/Download").exists() else Path(".")
-
-    custom_zip_name = f"{CUSTOM_PREFIX}{site_name}.zip"
-    zip_path = download_dir / custom_zip_name
-    output_dir = download_dir / f"temp_{site_name}"
-    output_dir.mkdir(parents=True, exist_ok=True)
     
-    # Auto Folder Structure Creation
-    dirs = {
-        'css': output_dir / "css",
-        'js': output_dir / "js",
-        'img': output_dir / "images",
-        'fonts': output_dir / "fonts"
-    }
-    for d in dirs.values():
-        d.mkdir(exist_ok=True)
+    # Auto Directory Path Setup for MT Manager
+    base_download_dir = Path("/sdcard/Download")
+    if not base_download_dir.exists():
+        base_download_dir = Path(".")
+        
+    hindustan_folder = base_download_dir / FOLDER_NAME
+    hindustan_folder.mkdir(parents=True, exist_ok=True)
 
+    zip_filename = f"{CUSTOM_PREFIX}{site_name}.zip"
+    zip_path = hindustan_folder / zip_filename
+
+    temp_dir = hindustan_folder / f"temp_{site_name}"
+    assets_dir = temp_dir / "assets"
+    temp_dir.mkdir(parents=True, exist_ok=True)
+    assets_dir.mkdir(parents=True, exist_ok=True)
+
+    console.print(f"[cyan]🌐 Connecting directly to {target_url}...[/cyan]")
     try:
-        console.print(f"[cyan]⏳ Connecting to {target_url}...[/cyan]")
-        response = requests.get(target_url, headers=headers, timeout=15)
+        response = requests.get(target_url, headers=headers, timeout=40)
         response.raise_for_status()
-        html_content = response.text
+        raw_html = response.text
     except Exception as e:
-        console.print(f"[bold red]❌ Connection Error: {e}[/bold red]")
+        console.print(f"[bold red]❌ Connection Error:[/bold red] {e}")
         return None, 0
 
-    soup = BeautifulSoup(html_content, 'html.parser')
-    download_tasks = [] 
+    # Advanced Asset Discovery using Regex (Captures CSS, JS, Media, Fonts, PHP Links)
+    asset_urls = re.findall(r'(?:href|src|action)=["\'](.*?)["\']', raw_html)
     
-    # 1. CSS Assets Extraction
-    css_counter = 1
-    for link in soup.find_all('link', rel=True):
-        if 'stylesheet' in link.get('rel', []):
-            href = link.get('href')
-            if href:
-                full_url = urljoin(target_url, href)
-                filename = f"style_{css_counter}.css"
-                local_path = dirs['css'] / filename
-                
-                # Download CSS and Extract Fonts/Images from inside CSS
-                try:
-                    css_res = requests.get(full_url, headers=headers, timeout=10)
-                    if css_res.status_code == 200:
-                        css_text = css_res.text
-                        # Find url(...) in CSS
-                        urls_in_css = re.findall(r'url\([\'"]?(.*?)[\'"]?\)', css_text)
-                        for url_in_css in urls_in_css:
-                            if url_in_css.startswith('data:'): continue
-                            asset_full_url = urljoin(full_url, url_in_css)
-                            ext = get_ext(asset_full_url, '.woff2').lower()
-                            
-                            # Check if it is a font or image
-                            if ext in ['.woff', '.woff2', '.ttf', '.eot', '.otf']:
-                                asset_name = f"font_{len(download_tasks)}{ext}"
-                                download_tasks.append((asset_full_url, dirs['fonts'] / asset_name))
-                                css_text = css_text.replace(url_in_css, f"../fonts/{asset_name}")
-                            else:
-                                asset_name = f"bg_{len(download_tasks)}{ext}"
-                                download_tasks.append((asset_full_url, dirs['img'] / asset_name))
-                                css_text = css_text.replace(url_in_css, f"../images/{asset_name}")
-                        
-                        local_path.write_text(css_text, encoding='utf-8')
-                        link['href'] = f"css/{filename}"
-                        css_counter += 1
-                except Exception:
-                    pass
+    download_queue = []
+    seen = set()
+    
+    for link in asset_urls:
+        if link.startswith("data:") or link.startswith("#") or link.startswith("javascript:"):
+            continue
+            
+        full_url = urljoin(target_url, link)
+        if full_url in seen:
+            continue
+        seen.add(full_url)
+        
+        parsed = urlparse(full_url)
+        ext = Path(parsed.path).suffix
+        if not ext or len(ext) > 5:
+            ext = ".asset"
+            
+        filename = f"file_{len(download_queue) + 1}{ext}"
+        relative_path = Path("assets") / filename
+        
+        download_queue.append((full_url, relative_path))
+        raw_html = raw_html.replace(link, f"assets/{filename}")
 
-    # 2. JS Assets Extraction
-    for i, script in enumerate(soup.find_all('script', src=True)):
-        src = script.get('src')
-        if src:
-            full_url = urljoin(target_url, src)
-            filename = f"script_{i+1}.js"
-            download_tasks.append((full_url, dirs['js'] / filename))
-            script['src'] = f"js/{filename}"
+    # Save Primary HTML Code
+    (temp_dir / "index.html").write_text(raw_html, encoding='utf-8')
 
-    # 3. Image Assets Extraction
-    for i, img in enumerate(soup.find_all('img', src=True)):
-        src = img.get('src')
-        if src and not src.startswith("data:"):
-            full_url = urljoin(target_url, src)
-            ext = get_ext(full_url)
-            filename = f"image_{i+1}{ext}"
-            download_tasks.append((full_url, dirs['img'] / filename))
-            img['src'] = f"images/{filename}"
-
-    # Save Clean Index HTML
-    (output_dir / "index.html").write_text(str(soup), encoding='utf-8')
-
-    # Multi-threaded Fast Download for Assets
-    if download_tasks:
+    # Multi-Threaded Engine for Heavy Downloading
+    if download_queue:
         with Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
@@ -178,65 +145,66 @@ def extract_full_source(target_url):
             console=console,
             transient=True
         ) as progress:
-            task = progress.add_task(f"[bold green]📦 Extracting {len(download_tasks)} Assets (JS, Images, Fonts)...[/bold green]", total=len(download_tasks))
+            task = progress.add_task(f"[yellow]📦 Extracting {len(download_queue)} Heavy Assets (Up to 10GB Limit)...", total=len(download_queue))
             
-            with ThreadPoolExecutor(max_workers=15) as executor:
-                futures = [executor.submit(download_file, asset[0], asset[1], headers) for asset in download_tasks]
+            with ThreadPoolExecutor(max_workers=30) as executor:
+                futures = [executor.submit(download_heavy_asset, item, headers, temp_dir) for item in download_queue]
                 for future in futures:
                     future.result()
                     progress.advance(task)
 
-    # Creating Final Auto ZIP File
+    # Creating ZIP Archive
+    console.print("[green]⚡ Packaging extracted source into ZIP...[/green]")
     with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-        for root, _, files in os.walk(output_dir):
+        for root, _, files in os.walk(temp_dir):
             for file in files:
                 file_path = Path(root) / file
-                arcname = file_path.relative_to(output_dir)
+                arcname = file_path.relative_to(temp_dir)
                 zipf.write(file_path, arcname)
 
-    # Cleanup Temporary Folders
+    # Cleanup Temporary Extractions
     try:
-        import shutil
-        shutil.rmtree(output_dir)
+        shutil.rmtree(temp_dir)
     except Exception:
         pass
 
-    return str(zip_path), zip_path.stat().st_size
+    zip_size = zip_path.stat().st_size
+    return str(zip_path), zip_size
 
 def main():
     console.clear()
     display_banner()
     
-    target_url = Prompt.ask("[bold green]🔗 Enter Full Website URL[/bold green]")
+    target_url = Prompt.ask("[bold green]🔗 Enter Target Website URL[/bold green]")
     
     if not target_url.startswith("http"):
         target_url = "https://" + target_url
         console.print(f"[dim]Auto-added https:// -> {target_url}[/dim]\n")
     
     console.print()
-    zip_file, size = extract_full_source(target_url)
+    zip_file, size = extract_direct_source(target_url)
     
     if zip_file:
         console.print(Panel(
-            f"🎉 [bold green]Full Source Extracted Successfully![/bold green] 🎉\n\n"
-            f"🎯 [bold orange3]Target URL:[/bold orange3] [bold white]{target_url}[/bold white]\n"
-            f"✅ [bold orange3]Extracted:[/bold orange3] [bold white]HTML, CSS, JS, Images, Fonts[/bold white]\n"
-            f"📦 [bold orange3]Saved Zip:[/bold orange3] [bold green]{zip_file}[/bold green]\n"
-            f"📏 [bold orange3]Total Size:[/bold orange3] [bold white]{format_size(size)}[/bold white]\n\n"
-            f"📂 [bold green]MT Manager Location:[/bold green]\nOpen MT Manager ➔ Download folder ➔ [bold orange3]{Path(zip_file).name}[/bold orange3]",
+            f"🎉 [bold green]FULL SOURCE CODE EXTRACTED SUCCESSFULLY![/bold green] 🎉\n\n"
+            f"🎯 [bold cyan]Target URL:[/bold cyan] [yellow]{target_url}[/yellow]\n"
+            f"📦 [bold cyan]Saved Package:[/bold cyan] [bold green]{Path(zip_file).name}[/bold green]\n"
+            f"📏 [bold cyan]Package Size:[/bold cyan]  [bold yellow]{format_size(size)}[/bold yellow]\n\n"
+            f"📂 [bold yellow]MT Manager Auto-Saved Path:[/bold yellow]\nOpen MT Manager ➔ Download ➔ [bold cyan]{FOLDER_NAME}[/bold cyan] ➔ [bold green]{Path(zip_file).name}[/bold green]",
             box=box.HEAVY,
-            border_style="green",
-            title="[bold green]Hindustan Hack Extractor v3.0[/bold green]"
+            border_style="red",
+            title="[bold yellow] HINDUSTAN EXTRACTOR RESULT [/bold yellow]"
         ))
     
-    another = Prompt.ask("\n[bold orange3]🔄 Extract another website?[/bold orange3]", choices=["y", "n"], default="n")
+    another = Prompt.ask("\n[bold cyan]🔄 Extract another website?[/bold cyan]", choices=["y", "n"], default="n")
     if another.lower() == 'y':
         main()
     else:
-        console.print("\n[bold green]🙏 Thanks for using Hindustan Hack Tool![/bold green]\n")
+        console.print("\n[bold red]🙏 Thank you for using Hindustan Hack Tool![/bold red]\n")
 
 if __name__ == "__main__":
     try:
         main()
     except KeyboardInterrupt:
-        console.print("\n\n[bold orange3]👋 Exited by user. Goodbye![/bold orange3]")
+        console.print("\n\n[yellow]👋 Exited by user. Goodbye![/yellow]")
+
