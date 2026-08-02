@@ -13,6 +13,10 @@ import requests
 import re
 import os
 import json
+import webbrowser
+import threading
+import time
+import socket
 
 app = Flask(__name__)
 
@@ -23,7 +27,7 @@ API_URL = "https://exploitsindia.site/osint/api.php"
 API_KEY = "anish-exploits"
 
 # ============================================
-# HTML TEMPLATE (Complete Website)
+# HTML TEMPLATE (Complete Website) - FIXED VERSION
 # ============================================
 HTML_TEMPLATE = '''
 <!DOCTYPE html>
@@ -858,6 +862,7 @@ HTML_TEMPLATE = '''
             user-drag: none;
             pointer-events: none;
         }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -950,7 +955,7 @@ HTML_TEMPLATE = '''
                     </label>
                     <div class="input-group">
                         <span class="country-code">+91</span>
-                        <input type="tel" id="phoneInput" placeholder="Enter phone number" maxlength="10" inputmode="numeric" value="">
+                        <input type="tel" id="phoneInput" placeholder="Enter phone number" maxlength="10" inputmode="numeric" value="9876543210">
                     </div>
                 </div>
 
@@ -1068,7 +1073,6 @@ function toggleJson() {
 // ============================================
 async function callAPI(number) {
     try {
-        // Use Flask proxy endpoint
         const response = await fetch('/api/lookup', {
             method: 'POST',
             headers: {
@@ -1078,7 +1082,7 @@ async function callAPI(number) {
         });
         
         if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
+            throw new Error('HTTP error! status: ' + response.status);
         }
         
         const data = await response.json();
@@ -1100,13 +1104,14 @@ function displayResults(number, data) {
     const recordCount = document.getElementById('recordCount');
     const apiInfo = document.getElementById('apiInfo');
     const jsonBox = document.getElementById('jsonBox');
+    const errorText = document.getElementById('errorText');
     
     jsonBox.textContent = JSON.stringify(data, null, 2);
     
     if (data.status === 'error') {
         resultBox.classList.remove('show');
-        document.getElementById('errorText').textContent = '❌ ' + (data.message || 'API Error');
-        document.getElementById('errorText').classList.add('show');
+        errorText.textContent = '❌ ' + (data.message || 'API Error');
+        errorText.classList.add('show');
         return;
     }
     
@@ -1119,60 +1124,60 @@ function displayResults(number, data) {
         let html = '';
         const info = results[0];
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-phone"></i> Phone</span>
-            <span class="value highlight">${info.num || '+91 ' + number}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-phone"></i> Phone</span>';
+        html += '<span class="value highlight">' + (info.num || '+91 ' + number) + '</span>';
+        html += '</div>';
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-user"></i> Full Name</span>
-            <span class="value highlight">${info.name || 'N/A'}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-user"></i> Full Name</span>';
+        html += '<span class="value highlight">' + (info.name || 'N/A') + '</span>';
+        html += '</div>';
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-user-tie"></i> Father's Name</span>
-            <span class="value">${info.fname || 'N/A'}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-user-tie"></i> Father\'s Name</span>';
+        html += '<span class="value">' + (info.fname || 'N/A') + '</span>';
+        html += '</div>';
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-id-card"></i> Aadhaar Number</span>
-            <span class="value green">${info.aadhar || 'N/A'}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-id-card"></i> Aadhaar Number</span>';
+        html += '<span class="value green">' + (info.aadhar || 'N/A') + '</span>';
+        html += '</div>';
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-map-pin"></i> Address</span>
-            <span class="value address">${info.address || 'N/A'}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-map-pin"></i> Address</span>';
+        html += '<span class="value address">' + (info.address || 'N/A') + '</span>';
+        html += '</div>';
         
-        html += `<div class="result-item">
-            <span class="label"><i class="fas fa-signal"></i> Network Circle</span>
-            <span class="value">${info.circle || 'N/A'}</span>
-        </div>`;
+        html += '<div class="result-item">';
+        html += '<span class="label"><i class="fas fa-signal"></i> Network Circle</span>';
+        html += '<span class="value">' + (info.circle || 'N/A') + '</span>';
+        html += '</div>';
         
         if (info.alt) {
-            html += `<div class="result-item">
-                <span class="label"><i class="fas fa-phone-plus"></i> Alternate Number</span>
-                <span class="value">${info.alt}</span>
-            </div>`;
+            html += '<div class="result-item">';
+            html += '<span class="label"><i class="fas fa-phone-plus"></i> Alternate Number</span>';
+            html += '<span class="value">' + info.alt + '</span>';
+            html += '</div>';
         }
         
         if (info.email) {
-            html += `<div class="result-item">
-                <span class="label"><i class="fas fa-envelope"></i> Email</span>
-                <span class="value">${info.email}</span>
-            </div>`;
+            html += '<div class="result-item">';
+            html += '<span class="label"><i class="fas fa-envelope"></i> Email</span>';
+            html += '<span class="value">' + info.email + '</span>';
+            html += '</div>';
         }
         
         resultContent.innerHTML = html;
         resultBox.classList.add('show');
-        document.getElementById('errorText').classList.remove('show');
+        errorText.classList.remove('show');
         
         let apiHtml = '';
         if (data.BUY_API) {
-            apiHtml += `<span><i class="fas fa-shopping-cart" style="color:#FF9933;"></i> BUY API: <strong>${data.BUY_API}</strong></span>`;
+            apiHtml += '<span><i class="fas fa-shopping-cart" style="color:#FF9933;"></i> BUY API: <strong>' + data.BUY_API + '</strong></span>';
         }
         if (data.SUPPORT) {
-            apiHtml += `<span><i class="fas fa-headset" style="color:#FF9933;"></i> SUPPORT: <strong>${data.SUPPORT}</strong></span>`;
+            apiHtml += '<span><i class="fas fa-headset" style="color:#FF9933;"></i> SUPPORT: <strong>' + data.SUPPORT + '</strong></span>';
         }
         if (apiHtml) {
             apiInfo.innerHTML = apiHtml;
@@ -1181,8 +1186,8 @@ function displayResults(number, data) {
         
     } else {
         resultBox.classList.remove('show');
-        document.getElementById('errorText').textContent = '❌ No data found for this number!';
-        document.getElementById('errorText').classList.add('show');
+        errorText.textContent = '❌ No data found for this number!';
+        errorText.classList.add('show');
     }
 }
 
@@ -1284,9 +1289,10 @@ document.addEventListener('dragstart', function(e) {
 });
 
 // ============================================
-// AUTO SEARCH
+// AUTO SEARCH ON LOAD
 // ============================================
 document.addEventListener('DOMContentLoaded', function() {
+    // Auto search with default number after 1.5 seconds
     setTimeout(function() {
         searchNumber();
     }, 1500);
@@ -1311,53 +1317,95 @@ def home():
 def lookup():
     try:
         data = request.get_json()
+        if not data:
+            return jsonify({"status": "error", "message": "Invalid request"})
+            
         number = data.get('number', '').strip()
         
         if not number:
             return jsonify({"status": "error", "message": "Phone number required"})
         
-        # Clean number
-        clean_number = re.sub(r'[\+\s\-]', '', number)
+        # Clean number - keep only digits
+        clean_number = re.sub(r'[\+\s\-\(\)]', '', number)
         
-        # Build API URL
+        # Build API URL with parameters
         params = {
             'key': API_KEY,
             'type': 'number',
             'num': clean_number
         }
         
-        # Call API
+        print(f"📤 Calling API for number: {clean_number}")
+        
+        # Call API with timeout
         response = requests.get(API_URL, params=params, timeout=30)
         response.raise_for_status()
         
         api_data = response.json()
+        print(f"📥 API Response: {api_data}")
         
         # Check if API returned error
         if api_data.get('status') == 'error':
             return jsonify(api_data)
         
-        # Format response
+        # Format and return response
         return jsonify({
             "status": "success",
             "result": api_data.get('result', [])
         })
         
     except requests.exceptions.Timeout:
-        return jsonify({"status": "error", "message": "API timeout"})
+        return jsonify({"status": "error", "message": "API request timeout. Please try again."})
+    except requests.exceptions.ConnectionError:
+        return jsonify({"status": "error", "message": "Network error. Please check your internet connection."})
     except requests.exceptions.RequestException as e:
         return jsonify({"status": "error", "message": f"API error: {str(e)}"})
+    except json.JSONDecodeError:
+        return jsonify({"status": "error", "message": "Invalid response from API"})
     except Exception as e:
+        print(f"❌ Server Error: {str(e)}")
         return jsonify({"status": "error", "message": f"Server error: {str(e)}"})
 
 # ============================================
-# MAIN: RUN SERVER
+# OPEN BROWSER FUNCTION
+# ============================================
+def open_browser():
+    """Open browser automatically after server starts"""
+    time.sleep(2)  # Wait for server to start
+    url = "http://localhost:5000"
+    print(f"\n🌐 Opening browser at: {url}")
+    webbrowser.open(url)
+
+# ============================================
+# GET LOCAL IP
+# ============================================
+def get_local_ip():
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
+# ============================================
+# MAIN: RUN SERVER WITH AUTO-OPEN
 # ============================================
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
-    print("\n" + "="*50)
-    print("🛡️  HINDUSTAN HACK - NUMBER INFORMATION")
-    print("="*50)
-    print(f"✅ Server running on: http://127.0.0.1:{port}")
-    print(f"📱 Open in browser: http://127.0.0.1:{port}")
-    print("="*50 + "\n")
+    local_ip = get_local_ip()
+    
+    print("\n" + "="*55)
+    print("  🛡️  HINDUSTAN HACK - NUMBER INFORMATION")
+    print("="*55)
+    print(f"  ✅ Server running on: http://localhost:{port}")
+    print(f"  📱 Local IP: http://{local_ip}:{port}")
+    print(f"  🌐 Opening browser automatically...")
+    print("="*55 + "\n")
+    
+    # Start browser in a separate thread
+    threading.Thread(target=open_browser, daemon=True).start()
+    
+    # Run the Flask server
     app.run(host='0.0.0.0', port=port, debug=False, threaded=True)
